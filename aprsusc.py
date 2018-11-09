@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 api_header = {'X-API-Key': 'ZKlkAenQo92aERecb4aTw9FECVeGIoa9je5PBiC3'}
 
-
+# Retrieves congress members from API
 def get_congress_members(chamber, session):
     assert chamber == 'house' or chamber == 'senate', "Chamber must be house or senate."
     assert type(session) is int and 0 < session <= 115, "Must be valid Congress session."
@@ -19,7 +19,7 @@ def get_congress_members(chamber, session):
         members.append({'name': concat_name(member), 'id': member['id'], 'party': member['party']})
     return members
 
-
+# Helper method
 def concat_name(member):
     middle_name = ' ' + member['middle_name'] + ' ' if member['middle_name'] is not None else ' '
     return member['first_name'] + middle_name + member['last_name']
@@ -70,17 +70,27 @@ def create_bipartite_consponsorship_graph(chamber, session):
                 g.AddNode(nid)
             g.AddEdge(id_to_nid[m1['id']], id_to_nid[bill['number']])
             g.AddEdge(id_to_nid[m2['id']], id_to_nid[bill['number']])
-    snap.SaveEdgeList(g, 'bcg.graph')
-    np.save('bcg_node_info.npy', node_info)
-    np.save('bcg_id_to_nid.npy', id_to_nid)
+    snap.SaveEdgeList(g, 'bcg_%s_%s.graph' % (chamber, session))
+    np.save('bcg_node_info_%s_%s.npy' % (chamber, session), node_info)
+    np.save('bcg_id_to_nid_%s_%s.npy' % (chamber, session), id_to_nid)
     print g.GetNodes()
     print g.GetEdges()
 
 
-def read_bcg():
-    edge_list_name = 'bcg.graph'
-    node_info_name = 'bcg_node_info.npy'
-    id_to_nid_name = 'bcg_id_to_nid.npy'
+# .npy holds dicts of congressman
+# id_to_nid is
+#   <id> (congressman id) => graph nid of congressman
+#   <id> (bill number) => graph nid of bill
+# node_info is
+#   <nid> => node info ({type: "member" OR "bill", info: <infodict>})
+#       member <infodict> => keys: <name> <id> <party: String (r, d, or i)>
+#       bill <infodict> => keys: <number = id> <title>
+
+
+def read_bcg(chamber, session):
+    edge_list_name = 'bcg_%s_%s.graph' % (chamber, session)
+    node_info_name = 'bcg_node_info_%s_%s.npy' % (chamber, session)
+    id_to_nid_name = 'bcg_id_to_nid_%s_%s.npy' % (chamber, session)
     return snap.LoadEdgeList(snap.PUNGraph, edge_list_name, 0, 1), \
            np.load(node_info_name).item(), \
            np.load(id_to_nid_name).item()
