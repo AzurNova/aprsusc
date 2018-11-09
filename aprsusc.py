@@ -101,16 +101,6 @@ def create_bipartite_consponsorship_graph(chamber, session):
     print g.GetEdges()
 
 
-# .npy holds dicts of congressman
-# id_to_nid is
-#   <id> (congressman id) => graph nid of congressman
-#   <id> (bill number) => graph nid of bill
-# node_info is
-#   <nid> => node info ({type: "member" OR "bill", info: <infodict>})
-#       member <infodict> => keys: <name> <id> <party: String (r, d, or i)>
-#       bill <infodict> => keys: <number = id> <title>
-
-
 def read_bcg(chamber, session):
     edge_list_name = 'bcg_%s_%s.graph' % (chamber, session)
     node_info_name = 'bcg_node_info_%s_%s.npy' % (chamber, session)
