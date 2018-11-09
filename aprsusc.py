@@ -54,14 +54,18 @@ def get_cosponsorship(id1, id2, chamber, session):
 def get_covote_data(id1, id2, chamber, session):
     assert chamber == 'house' or chamber == 'senate', "Chamber must be house or senate."
     assert type(session) is int and 0 < session <= 115, "Must be valid Congress session."
-    r = rq.get('https://api.propublica.org/congress/v1/members/%s/votes/%s/%s/%s.json % (id1, id2, chamber, session)',
+    r = rq.get('https://api.propublica.org/congress/v1/members/%s/votes/%s/%s/%s.json' % (id1, id2, session, chamber),
                headers=api_header)
-    while r.json()['status'] != 'OK':
-        print 'Request failed for ids: %s, %s, trying again.' % (id1, id2)
-        time.sleep(1)
-        r = rq.get(
-            'https://api.propublica.org/congress/v1/members/%s/votes/%s/%s/%s.json % (id1, id2, chamber, session)',
-            headers=api_header)
+    try:
+        while r.json()['status'] != 'OK':
+            print 'Request failed for ids: %s, %s, trying again.' % (id1, id2)
+            time.sleep(1)
+            r = rq.get(
+                'https://api.propublica.org/congress/v1/members/%s/votes/%s/%s/%s.json' % (id1, id2, session, chamber),
+                headers=api_header)
+    except ValueError:
+        print 'https://api.propublica.org/congress/v1/members/%s/votes/%s/%s/%s.json' % (id1, id2, session, chamber)
+        return None
     return r.json()
 
 
@@ -174,13 +178,16 @@ def create_weighted_vote_graph(chamber, session):
             id_to_nid[m2['id']] = nid
             created_nodes.add(m2['id'])
             g.AddNode(nid)
-        data = get_covote_data(m1['id'], m2['id'], chamber, session)['results'][0]
+        d = get_covote_data(m1['id'], m2['id'], chamber, session)
+        if d is None:
+            continue
+        data = d['results'][0]
         key = tuple(sorted([data['first_member_id'], data['second_member_id']]))
         covote_data[key] = {'common_votes': data['common_votes'], 'disagree_votes': data['disagree_votes'],
                             'agree_percent': data['agree_percent'], 'disagree_percent': data['disagree_percent']}
-        g.AddEdge(id_to_nid[m1['id'], id_to_nid[m2['id']]])
-        edge_weights[id_to_nid[m1['id']][id_to_nid[m2['id']]]] = float(data['agree_percent']) / 100
-        edge_weights[id_to_nid[m2['id']][id_to_nid[m1['id']]]] = float(data['agree_percent']) / 100
+        g.AddEdge(id_to_nid[m1['id']], id_to_nid[m2['id']])
+        edge_weights[id_to_nid[m1['id']]][id_to_nid[m2['id']]] = float(data['agree_percent']) / 100
+        edge_weights[id_to_nid[m2['id']]][id_to_nid[m1['id']]] = float(data['agree_percent']) / 100
     snap.SaveEdgeList(g, 'wvg_%s_%s.graph' % (chamber, session))
     np.save('wvg_node_info_%s_%s.npy' % (chamber, session), node_info)
     np.save('wvg_id_to_nid_%s_%s.npy' % (chamber, session), id_to_nid)
@@ -194,7 +201,8 @@ def main():
     chamber = 'senate'
     session = 115
     # create_bipartite_consponsorship_graph(chamber, session)
-    create_weighted_graph(chamber, session)
+    # create_weighted_graph(chamber, session)
+    create_weighted_vote_graph(chamber, session)
 
 
 if __name__ == '__main__':
