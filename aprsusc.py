@@ -196,14 +196,13 @@ def create_weighted_vote_graph(chamber, session):
     np.save('data/wvg_id_to_nid_%s_%s.npy' % (chamber, session), id_to_nid)
     np.save('data/wvg_edge_weights_%s_%s.npy' % (chamber, session), edge_weights)
     np.save('data/wvg_covote_data_%s_%s.npy' % (chamber, session), covote_data)
-    print g.GetNodes()
-    print g.GetEdges()
 
 
 def main():
     chamber = 'senate'
     sessions = np.arange(100, 114, 1)
-    for session in sessions:
+    for float_session in sessions:
+        session = int(float_session)
         create_bipartite_consponsorship_graph(chamber, session)
         create_weighted_graph(chamber, session)
         create_weighted_vote_graph(chamber, session)
