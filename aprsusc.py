@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 api_header = {'X-API-Key': 'ZKlkAenQo92aERecb4aTw9FECVeGIoa9je5PBiC3'}
 
+
 # Retrieves congress members from API
 def get_congress_members(chamber, session):
     assert chamber == 'house' or chamber == 'senate', "Chamber must be house or senate."
@@ -34,12 +35,16 @@ def get_cosponsorship_data(id1, id2, chamber, session):
     assert type(session) is int and 0 < session <= 115, "Must be valid Congress session."
     r = rq.get('https://api.propublica.org/congress/v1/members/%s/bills/%s/%s/%s.json' % (id1, id2, session, chamber),
                headers=api_header)
-    while r.json()['status'] != 'OK':
-        print 'Request failed for ids: %s, %s, trying again.' % (id1, id2)
-        time.sleep(1)
-        r = rq.get(
-            'https://api.propublica.org/congress/v1/members/%s/bills/%s/%s/%s.json' % (id1, id2, session, chamber),
-            headers=api_header)
+    try:
+        while r.json()['status'] != 'OK':
+            print 'Request failed for ids: %s, %s, trying again.' % (id1, id2)
+            time.sleep(1)
+            r = rq.get(
+                'https://api.propublica.org/congress/v1/members/%s/bills/%s/%s/%s.json' % (id1, id2, session, chamber),
+                headers=api_header)
+    except ValueError:
+        print 'https://api.propublica.org/congress/v1/members/%s/bills/%s/%s/%s.json' % (id1, id2, session, chamber)
+        return None
     return r.json()
 
 
@@ -89,6 +94,8 @@ def create_bipartite_consponsorship_graph(chamber, session):
             created_nodes.add(m2['id'])
             g.AddNode(nid)
         bills = get_cosponsorship(m1['id'], m2['id'], chamber, session)
+        if bills is None:
+            continue
         for bill in bills:
             if bill['number'] not in created_nodes:
                 nid = g.GetMxNId()
@@ -98,17 +105,15 @@ def create_bipartite_consponsorship_graph(chamber, session):
                 g.AddNode(nid)
             g.AddEdge(id_to_nid[m1['id']], id_to_nid[bill['number']])
             g.AddEdge(id_to_nid[m2['id']], id_to_nid[bill['number']])
-    snap.SaveEdgeList(g, 'bcg_%s_%s.graph' % (chamber, session))
-    np.save('bcg_node_info_%s_%s.npy' % (chamber, session), node_info)
-    np.save('bcg_id_to_nid_%s_%s.npy' % (chamber, session), id_to_nid)
-    print g.GetNodes()
-    print g.GetEdges()
+    snap.SaveEdgeList(g, 'data/bcg_%s_%s.graph' % (chamber, session))
+    np.save('data/bcg_node_info_%s_%s.npy' % (chamber, session), node_info)
+    np.save('data/bcg_id_to_nid_%s_%s.npy' % (chamber, session), id_to_nid)
 
 
 def read_bcg(chamber, session):
-    edge_list_name = 'bcg_%s_%s.graph' % (chamber, session)
-    node_info_name = 'bcg_node_info_%s_%s.npy' % (chamber, session)
-    id_to_nid_name = 'bcg_id_to_nid_%s_%s.npy' % (chamber, session)
+    edge_list_name = 'data/bcg_%s_%s.graph' % (chamber, session)
+    node_info_name = 'data/bcg_node_info_%s_%s.npy' % (chamber, session)
+    id_to_nid_name = 'data/bcg_id_to_nid_%s_%s.npy' % (chamber, session)
     return snap.LoadEdgeList(snap.PUNGraph, edge_list_name, 0, 1), \
            np.load(node_info_name).item(), \
            np.load(id_to_nid_name).item()
@@ -150,11 +155,9 @@ def create_weighted_graph(chamber, session):
             edge_weights[(node, node2)] = common_bills / num_bills
             edge_weights[(node2, node)] = common_bills / num_bills2
             wg.AddEdge(node, node2)
-    snap.SaveEdgeList(wg, 'wcg_%s_%s.graph' % (chamber, session))
-    np.save('wcg_edge_weights_%s_%s.npy' % (chamber, session), edge_weights)
-    np.save('wcg_sponsored_bills_%s_%s.npy' % (chamber, session), sponsored_bills)
-    print wg.GetNodes()
-    print wg.GetEdges()
+    snap.SaveEdgeList(wg, 'data/wcg_%s_%s.graph' % (chamber, session))
+    np.save('data/wcg_edge_weights_%s_%s.npy' % (chamber, session), edge_weights)
+    np.save('data/wcg_sponsored_bills_%s_%s.npy' % (chamber, session), sponsored_bills)
 
 
 def create_weighted_vote_graph(chamber, session):
@@ -189,20 +192,21 @@ def create_weighted_vote_graph(chamber, session):
         edge_weights[id_to_nid[m1['id']]][id_to_nid[m2['id']]] = float(data['agree_percent']) / 100
         edge_weights[id_to_nid[m2['id']]][id_to_nid[m1['id']]] = float(data['agree_percent']) / 100
     snap.SaveEdgeList(g, 'wvg_%s_%s.graph' % (chamber, session))
-    np.save('wvg_node_info_%s_%s.npy' % (chamber, session), node_info)
-    np.save('wvg_id_to_nid_%s_%s.npy' % (chamber, session), id_to_nid)
-    np.save('wvg_edge_weights_%s_%s.npy' % (chamber, session), edge_weights)
-    np.save('wvg_covote_data_%s_%s.npy' % (chamber, session), covote_data)
+    np.save('data/wvg_node_info_%s_%s.npy' % (chamber, session), node_info)
+    np.save('data/wvg_id_to_nid_%s_%s.npy' % (chamber, session), id_to_nid)
+    np.save('data/wvg_edge_weights_%s_%s.npy' % (chamber, session), edge_weights)
+    np.save('data/wvg_covote_data_%s_%s.npy' % (chamber, session), covote_data)
     print g.GetNodes()
     print g.GetEdges()
 
 
 def main():
     chamber = 'senate'
-    session = 115
-    # create_bipartite_consponsorship_graph(chamber, session)
-    # create_weighted_graph(chamber, session)
-    create_weighted_vote_graph(chamber, session)
+    sessions = np.arange(100, 114, 1)
+    for session in sessions:
+        create_bipartite_consponsorship_graph(chamber, session)
+        create_weighted_graph(chamber, session)
+        create_weighted_vote_graph(chamber, session)
 
 
 if __name__ == '__main__':
