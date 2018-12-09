@@ -33,23 +33,27 @@ def concat_name(member):
 def get_cosponsorship_data(id1, id2, chamber, session):
     assert chamber == 'house' or chamber == 'senate', "Chamber must be house or senate."
     assert type(session) is int and 0 < session <= 115, "Must be valid Congress session."
-    r = rq.get('https://api.propublica.org/congress/v1/members/%s/bills/%s/%s/%s.json' % (id1, id2, session, chamber),
-               headers=api_header)
+    try_url = 'https://api.propublica.org/congress/v1/members/%s/bills/%s/%s/%s.json' % (id1, id2, session, chamber)
+    r = rq.get(try_url, headers=api_header)
     try:
+        count = 0
         while r.json()['status'] != 'OK':
-            print 'Request failed for ids: %s, %s, trying again.' % (id1, id2)
-            time.sleep(1)
-            r = rq.get(
-                'https://api.propublica.org/congress/v1/members/%s/bills/%s/%s/%s.json' % (id1, id2, session, chamber),
-                headers=api_header)
+            count += 1
+            if count > 3:
+                tqdm.write('Request failed 3x for cosponsorship data, ids: %s, %s. %s' % (id1, id2, try_url))
+                return None
+            time.sleep(2)
+            r = rq.get(try_url, headers=api_header)
     except ValueError:
-        print 'https://api.propublica.org/congress/v1/members/%s/bills/%s/%s/%s.json' % (id1, id2, session, chamber)
+        print 'ValueError: %s' % (try_url)
         return None
     return r.json()
 
 
 def get_cosponsorship(id1, id2, chamber, session):
     data = get_cosponsorship_data(id1, id2, chamber, session)
+    if data == None:
+        return None
     bills = []
     for bill in data['results'][0]['bills']:
         bills.append({'number': bill['number'], 'title': bill['title']})
@@ -59,22 +63,25 @@ def get_cosponsorship(id1, id2, chamber, session):
 def get_covote_data(id1, id2, chamber, session):
     assert chamber == 'house' or chamber == 'senate', "Chamber must be house or senate."
     assert type(session) is int and 0 < session <= 115, "Must be valid Congress session."
-    r = rq.get('https://api.propublica.org/congress/v1/members/%s/votes/%s/%s/%s.json' % (id1, id2, session, chamber),
-               headers=api_header)
+    try_url = 'https://api.propublica.org/congress/v1/members/%s/votes/%s/%s/%s.json' % (id1, id2, session, chamber)
+    r = rq.get(try_url, headers=api_header)
     try:
+        count = 0
         while r.json()['status'] != 'OK':
-            print 'Request failed for ids: %s, %s, trying again.' % (id1, id2)
-            time.sleep(1)
-            r = rq.get(
-                'https://api.propublica.org/congress/v1/members/%s/votes/%s/%s/%s.json' % (id1, id2, session, chamber),
-                headers=api_header)
+            count += 1
+            if count > 3:
+                tqdm.write('Request failed 3x for covote data, ids: %s, %s. %s' % (id1, id2, try_url))
+                return None
+            time.sleep(2)
+            r = rq.get(try_url, headers=api_header)
     except ValueError:
-        print 'https://api.propublica.org/congress/v1/members/%s/votes/%s/%s/%s.json' % (id1, id2, session, chamber)
+        print 'ValueError: %s' % (try_url)
         return None
     return r.json()
 
 
 def create_bipartite_consponsorship_graph(chamber, session):
+    print("Creating bipartite cosponsorship graph (bcg)...")
     g = snap.TUNGraph.New()
     node_info = {}
     id_to_nid = {}
@@ -108,6 +115,7 @@ def create_bipartite_consponsorship_graph(chamber, session):
     snap.SaveEdgeList(g, 'data/bcg_%s_%s.graph' % (chamber, session))
     np.save('data/bcg_node_info_%s_%s.npy' % (chamber, session), node_info)
     np.save('data/bcg_id_to_nid_%s_%s.npy' % (chamber, session), id_to_nid)
+    print("Completed bipartite cosponsorship graph!")
 
 
 def read_bcg(chamber, session):
@@ -119,17 +127,20 @@ def read_bcg(chamber, session):
            np.load(id_to_nid_name).item()
 
 
-def create_weighted_graph(chamber, session):
+def create_weighted_cosponsorship_graph(chamber, session):
+    print("Creating weighted cosponsorship graph (wcg)...")
     g, node_info, id_to_nid = read_bcg(chamber, session)
     edge_weights = {}
     sponsored_bills = {}
-    wg = snap.TUNGraph.New()
-    for node in node_info:
+    wcg = snap.TUNGraph.New()
+    for node in tqdm(node_info, total=len(node_info), position=0):
         if node_info[node]['type'] == 'bill':
             continue
-        if not wg.IsNode(node):
-            wg.AddNode(node)
+        if not wcg.IsNode(node):
+            wcg.AddNode(node)
         connected = snap.TIntV()
+        if not g.IsNode(node):
+            print("FUCK WHY IS %s NOT A NODE" % (node,))
         snap.GetNodesAtHop(g, node, 2, connected, False)
         if node in sponsored_bills:
             num_bills = sponsored_bills[node]
@@ -138,11 +149,11 @@ def create_weighted_graph(chamber, session):
             snap.GetNodesAtHop(g, node, 1, bills, False)
             num_bills = len(bills)
             sponsored_bills[node] = num_bills
-        for node2 in tqdm(connected, total=len(connected)):
+        for node2 in connected:
             if node == node2:
                 continue
-            if not wg.IsNode(node2):
-                wg.AddNode(node2)
+            if not wcg.IsNode(node2):
+                wcg.AddNode(node2)
             if node2 in sponsored_bills:
                 num_bills2 = sponsored_bills[node2]
             else:
@@ -154,13 +165,14 @@ def create_weighted_graph(chamber, session):
             common_bills = int(data['results'][0]['common_bills'])
             edge_weights[(node, node2)] = common_bills / num_bills
             edge_weights[(node2, node)] = common_bills / num_bills2
-            wg.AddEdge(node, node2)
-    snap.SaveEdgeList(wg, 'data/wcg_%s_%s.graph' % (chamber, session))
+            wcg.AddEdge(node, node2)
+    snap.SaveEdgeList(wcg, 'data/wcg_%s_%s.graph' % (chamber, session))
     np.save('data/wcg_edge_weights_%s_%s.npy' % (chamber, session), edge_weights)
     np.save('data/wcg_sponsored_bills_%s_%s.npy' % (chamber, session), sponsored_bills)
-
+    print("Completed weighted cosponsorship graph!")
 
 def create_weighted_vote_graph(chamber, session):
+    print("Creating weighted vote graph (wcg)...")
     g = snap.TUNGraph.New()
     node_info = {}
     id_to_nid = {}
@@ -196,15 +208,16 @@ def create_weighted_vote_graph(chamber, session):
     np.save('data/wvg_id_to_nid_%s_%s.npy' % (chamber, session), id_to_nid)
     np.save('data/wvg_edge_weights_%s_%s.npy' % (chamber, session), edge_weights)
     np.save('data/wvg_covote_data_%s_%s.npy' % (chamber, session), covote_data)
-
+    print("Completed weighted vote graph!")
 
 def main():
     chamber = 'senate'
-    sessions = np.arange(100, 114, 1)
+    sessions = np.arange(111, 112, 1)
     for float_session in sessions:
+        print "session: %s" % (float_session)
         session = int(float_session)
         create_bipartite_consponsorship_graph(chamber, session)
-        create_weighted_graph(chamber, session)
+        create_weighted_cosponsorship_graph(chamber, session)
         create_weighted_vote_graph(chamber, session)
 
 
