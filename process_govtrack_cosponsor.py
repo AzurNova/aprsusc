@@ -156,6 +156,24 @@ def create_bipartite_consponsorship_graph(chamber, session):
     print("Completed bipartite cosponsorship graph!")
 
 
+def make_zhangi_happy(chamber, session):
+    weights_total = {}
+    weights_by_i = {}
+    party = {}
+    m, b, to_bills = process_govtrack_data(chamber, session)
+    for m1 in m:
+        for m2 in m:
+            if m1['id'] == m2['id']:
+                continue
+            shared_bills = get_cosponsorship(m1['id'], m2['id'], to_bills)
+            weights_total[(m1['id'], m2['id'])] = len(shared_bills) / len(b)
+            weights_by_i[(m1['id'], m2['id'])] = len(shared_bills) / len(to_bills[m1['id']]) if len(to_bills[m1['id']]) != 0 else 0
+        party[m1['id']] = m1['party']
+    np.save('govtrack_data/zhangi_happy_%s_%s_weights_total' % (chamber, session), weights_total)
+    np.save('govtrack_data/zhangi_happy_%s_%s_weights_by_i' % (chamber, session), weights_by_i)
+    np.save('govtrack_data/zhangi_happy_%s_%s_party' % (chamber, session), party)
+
+
 def read_bcg(chamber, session):
     edge_list_name = 'govtrack_data/bcg_%s_%s.graph' % (chamber, session)
     node_info_name = 'govtrack_data/bcg_node_info_%s_%s.npy' % (chamber, session)
@@ -216,8 +234,9 @@ def create_weighted_cosponsorship_graph(chamber, session):
 def main():
     #split_govtrack_data()
     #generate_legisators_party_dicts()
-    create_bipartite_consponsorship_graph('senate', 114)
-    create_weighted_cosponsorship_graph('senate', 114)
+    #create_bipartite_consponsorship_graph('senate', 114)
+    #create_weighted_cosponsorship_graph('senate', 114)
+    make_zhangi_happy('senate', 114)
 
 
 if __name__ == "__main__":
