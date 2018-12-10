@@ -148,7 +148,7 @@ def main():
     #93 => 114
     for session in range(93, 115):
         process_cosponsor('senate', session)
-    for session in range(101, 115):
+    for session in range(101, 116):
         process_voting('senate', session)
 
 

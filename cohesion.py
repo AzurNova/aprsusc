@@ -72,7 +72,7 @@ def plot_cosponsorship_cohesion(sessions):
         ax.grid(color=(0.75, 0.75, 0.75), linestyle='--', linewidth=1)
         ax.legend()
         ax.set_xlabel("session")
-    fig.suptitle("senate party cosponsorship cohesion")
+    # fig.suptitle("senate party cosponsorship cohesion")
     plt.show()
 
 def plot_voting_cohesion(sessions):
@@ -102,13 +102,13 @@ def plot_voting_cohesion(sessions):
         ax.grid(color=(0.75, 0.75, 0.75), linestyle='--', linewidth=1)
         ax.legend()
         ax.set_xlabel("session")
-    fig.suptitle("senate party voting cohesion")
+    # fig.suptitle("senate party voting cohesion")
     plt.show()
 
 def main():
     main2()
     plot_cosponsorship_cohesion(range(93,115))
-    plot_voting_cohesion(range(101,115))
+    plot_voting_cohesion(range(101,116))
 
 if __name__ == "__main__":
     main()
