@@ -1,115 +1,86 @@
-from read_graph import *
+import read_happy
+import numpy as np
+from matplotlib import pyplot as plt
 
-def wcg_cohesion(wcg, bcg_node_info, bcg_id_to_nid, wcg_edge_weights):
-    # Sanity check: all edge weights in wcg_edge_weights:
-    for i, j in wcg_edge_weights:
-        assert (wcg.IsEdge(i, j))
+def main2():
+    member_to_party, edge_weights_by_i, edge_weights_total = read_happy.read_wcg("senate", 114)
+    cohesion(edge_weights_total, member_to_party)
+    # cohesion(edge_weights_total, party_assign)
 
-    # Initialize party_members by scraping bcg_node_info for member nodes
-    parties = ["D", "R", "I"]
-    party_members = {p:[] for p in parties}
-    for nid in bcg_node_info:
-        nid_info = bcg_node_info[nid]
-        type_, info = nid_info["type"], nid_info["info"]
-        if type_ == "member":
-            party, name, id = info["party"], info["name"], info["id"]
-            party_members[party].append(nid)
-            assert(wcg.IsNode(nid))
-    party_counts = dict(map(lambda x: (x, len(party_members[x])), party_members))
+# Calculates "cohesion" (intra-cluster and inter-cluster density) from the wcg
+def cohesion(edge_weights, member_to_party):
+    all_members = [m for m in member_to_party]
+    print "all_members:", all_members
+    party_members = {p : [] for p in ["D", "R", "I"]}
+    for member in member_to_party:
+        party = member_to_party[member]
+        party_members[party].append(member)
 
-    # print "party counts:", party_counts
-    total_congressmen = sum(party_counts.values())
+    dint = {p : 0. for p in party_members}
+    dext = {p : 0. for p in party_members}
+    dG   = {p : 0. for p in party_members}
+    print "party_members:", party_members
+    for party in party_members:
+        wint, wext, eint, eext = 0., 0., 0., 0.
+        for i in party_members[party]:
+            for j in all_members:
+                if (i, j) in edge_weights:
+                    if member_to_party[i] == member_to_party[j]:
+                        wint += edge_weights[i, j]
+                        eint += 1
+                    else:
+                        wext += edge_weights[i, j]
+                        eext += 1
+        print wint, eint, wext, eext
+        if eint > 0:
+            dint[party] = wint / eint
+        if eext > 0:
+            dext[party] = wext / eext
+    dG = sum(edge_weights.values()) / len(edge_weights)
+    print "dint:", dint
+    print "dext:", dext
+    print "dG:", dG
+    return dint, dext, dG
 
-    # Calculates intra-cluster (int) and inter-cluster (ext) degrees
-    int_degrees, ext_degrees = {}, {}
-    for party in parties:
-        members = party_members[party]
-        for m in members:
-            int_degrees[m] = 0
-        for i in range(len(members)-1):
-            mi = members[i]
-            for j in range(i+1, len(members)):
-                mj = members[j]
-                if wcg.IsEdge(mi, mj):
-                    int_degrees[mi] += 1
-                    int_degrees[mj] += 1
-        for m in members:
-            ext_degrees[m] = wcg.GetNI(m).GetDeg() - int_degrees[m]
+def plot_cosponsorship_cohesion(sessions):
+    dints, dexts, dGs = {}, {}, {}
+    for session in sessions:
+        print("year %s" % session)
+        member_to_party, edge_weights_by_i, edge_weights_total = read_happy.read_wcg("senate", session)
+        dints[session], dexts[session], dGs[session] = cohesion(edge_weights_by_i, member_to_party)
+    for party, color in [("D", "b"), ("R", "r")]: #, ("I", "g")]:
+        dint = [dints[session][party] for session in sessions if dints[session][party] > 0]
+        dext = [dexts[session][party] for session in sessions]
+        plt.plot(sessions, dint, color + ".-")
+        plt.plot(sessions, dext, color + ".-")
+    dGs = [dGs[session] for session in sessions]
+    plt.plot(sessions, dGs, "k.--")
+    plt.xticks(np.arange(95, 116, 5))
+    plt.yticks(np.arange(0, 0.6, 0.1))
+    plt.grid(color=(0.75, 0.75, 0.75), linestyle='--', linewidth=1)
+    plt.show()
 
-    party_cohesion = {"D": 0., "R": 0., "I": 0.}
-    member_scores = {}
-    for party in parties:
-        members = party_members[party]
-        if len(members) < 2:
-            continue
-        int_edges = 0
-        for msrc in members:
-            score = 0.
-            for mdst in members:
-                if msrc is not mdst and (msrc, mdst) in wcg_edge_weights:
-                    score += wcg_edge_weights[msrc, mdst]
-            member_scores[msrc] = score
-            party_cohesion[party] += score
-            int_edges += int_degrees[msrc]
-        int_edges /= 2
-        party_cohesion[party] /= int_edges
-
-    party_cohesion["ALL"] = sum(wcg_edge_weights.values()) / wcg.GetEdges()
-    # print edge_weights
-
-    return party_cohesion
-
-def wcg_degrees(edge_weights):
-    odegs, idegs = {}, {}
-    for src, dst in edge_weights:
-        if src not in odegs:
-            odegs[src] = 0.
-        if dst not in idegs:
-            idegs[dst] = 0.
-        odegs[src] += edge_weights[src, dst]
-        idegs[dst] += edge_weights[src, dst]
-    return odegs, idegs
-
-def get_parties(node_info, nodes):
-    return [node_info[i]["info"]["party"] for i in nodes]
-
-def same_party(node_info, i, j):
-    pi, pj = get_parties(node_info, [i, j])
-    return pi == pj
-
-def wcg_modularity(wcg, node_info, id_to_nid, edge_weights):
-    m = sum(edge_weights.itervalues())
-    odegs, idegs = wcg_degrees(edge_weights)
-    Q = 0.
-    for i, j in edge_weights:
-        if not same_party(node_info, i, j):
-            continue
-        Aij = edge_weights[i,j] if (i,j in edge_weights) else 0.
-        dio, dji = odegs[i], idegs[j]
-        Q += Aij - dio*dji/m
-    Q /= m
-    return Q
+# def plot_voting_cohesion(sessions):
+#     dints_all, dexts_all, dGs_all = {}, {}, {}
+#     for session in sessions:
+#         print("year %s" % session)
+#         wvg, wvg_info = read_happy.read_wvg("senate", session)
+#         dints_all[session], dexts_all[session], dGs_all[session] = cohesion(wvg, *wvg_info, voting=True)
+#     for party, color in [("D", "b"), ("R", "r"), ("I", "g")]:
+#         dints = [dints_all[session][party] for session in sessions]
+#         dexts = [dexts_all[session][party] for session in sessions]
+#         plt.plot(sessions, dints, color + ".-")
+#         plt.plot(sessions, dexts, color + ".-")
+#     dGs = [dGs_all[session] for session in sessions]
+#     plt.plot(sessions, dGs, "k.--")
+#     plt.xticks(np.arange(100, 120, 5))
+#     plt.yticks(np.arange(0, 1, 0.5))
+#     plt.show()
 
 def main():
-    print "wcg cohesion test"
-    wcg, wcg_info = read_wcg("senate", 115)
-    party_cohesion = wcg_cohesion(wcg, *wcg_info)
-    print party_cohesion
-
-    print "\nwcg modularity test"
-    modularity = wcg_modularity(wcg, *wcg_info)
-    print modularity
-
-    # print "\nrandom test"
-    # test = []
-    # edge_list = wcg_info[3]
-    # for edge in edge_list:
-    #     src, dst = edge
-    #     if src == 0:
-    #         test.append(edge_list[edge])
-    # print sum(test)
-    # pass
-
+    # main2()
+    plot_cosponsorship_cohesion(range(93,115))
+    # plot_voting_cohesion([114, 115])
 
 if __name__ == "__main__":
     main()

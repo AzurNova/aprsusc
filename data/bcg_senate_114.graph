@@ -1,4 +1,4 @@
-# Undirected graph (each unordered pair of nodes is saved once): bcg_senate_114.graph
+# Undirected graph (each unordered pair of nodes is saved once): data/bcg_senate_114.graph
 # Nodes: 2433 Edges: 25397
 # NodeId	NodeId
 0	2

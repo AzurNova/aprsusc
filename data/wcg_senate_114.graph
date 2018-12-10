@@ -1,4 +1,4 @@
-# Undirected graph (each unordered pair of nodes is saved once): wcg_senate_114.graph
+# Undirected graph (each unordered pair of nodes is saved once): data/wcg_senate_114.graph
 # Nodes: 100 Edges: 4950
 # NodeId	NodeId
 0	1

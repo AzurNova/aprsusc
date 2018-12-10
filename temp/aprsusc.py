@@ -8,8 +8,11 @@ import snap
 import time
 from tqdm import tqdm
 
+# Lucas
+# api_header = {'X-API-Key': 'ZKlkAenQo92aERecb4aTw9FECVeGIoa9je5PBiC3'}
 
-api_header = {'X-API-Key': 'ZKlkAenQo92aERecb4aTw9FECVeGIoa9je5PBiC3'}
+# Andrew
+api_header = {'X-API-Key': 'cmsCUhTyYCeaWlFD7Yeq8yiDt99A8MZifD4igDHa'}
 
 
 # Retrieves congress members from API
@@ -203,16 +206,16 @@ def create_weighted_vote_graph(chamber, session):
         g.AddEdge(id_to_nid[m1['id']], id_to_nid[m2['id']])
         edge_weights[id_to_nid[m1['id']]][id_to_nid[m2['id']]] = float(data['agree_percent']) / 100
         edge_weights[id_to_nid[m2['id']]][id_to_nid[m1['id']]] = float(data['agree_percent']) / 100
-    snap.SaveEdgeList(g, 'wvg_%s_%s.graph' % (chamber, session))
-    np.save('data/wvg_node_info_%s_%s.npy' % (chamber, session), node_info)
-    np.save('data/wvg_id_to_nid_%s_%s.npy' % (chamber, session), id_to_nid)
-    np.save('data/wvg_edge_weights_%s_%s.npy' % (chamber, session), edge_weights)
-    np.save('data/wvg_covote_data_%s_%s.npy' % (chamber, session), covote_data)
+    snap.SaveEdgeList(g, 'data2/wvg_%s_%s.graph' % (chamber, session))
+    np.save('data2/wvg_node_info_%s_%s.npy' % (chamber, session), node_info)
+    np.save('data2/wvg_id_to_nid_%s_%s.npy' % (chamber, session), id_to_nid)
+    np.save('data2/wvg_edge_weights_%s_%s.npy' % (chamber, session), edge_weights)
+    np.save('data2/wvg_covote_data_%s_%s.npy' % (chamber, session), covote_data)
     print("Completed weighted vote graph!")
 
 def main():
     chamber = 'senate'
-    sessions = np.arange(111, 112, 1)
+    sessions = np.arange(114, 115, 1)
     for float_session in sessions:
         print "session: %s" % (float_session)
         session = int(float_session)
