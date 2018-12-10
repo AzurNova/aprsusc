@@ -146,16 +146,15 @@ def process_voting(chamber, session):
 
 
 def main():
-    #93 => 114
     #for session in range(93, 115):
     #    process_cosponsor('senate', session)
     #for session in range(101, 116):
     #    process_voting('senate', session)
 
-    for session in range(93, 115):
-        process_cosponsor('senate', session)
+    #for session in range(93, 115):
+    #    process_cosponsor('house', session)
     for session in range(101, 116):
-        process_voting('senate', session)
+        process_voting('house', session)
 
 
 if __name__ == "__main__":
