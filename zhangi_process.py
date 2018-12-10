@@ -144,8 +144,14 @@ def process_voting(chamber, session):
     np.save('zhangi/happy_wvg_%s_%s_weights_by_i' % (chamber, session), weights_by_i)
     np.save('zhangi/happy_wvg_%s_%s_party' % (chamber, session), member_to_party)
 
+
 def main():
     #93 => 114
+    #for session in range(93, 115):
+    #    process_cosponsor('senate', session)
+    #for session in range(101, 116):
+    #    process_voting('senate', session)
+
     for session in range(93, 115):
         process_cosponsor('senate', session)
     for session in range(101, 116):
