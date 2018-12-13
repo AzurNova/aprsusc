@@ -179,9 +179,9 @@ def make_zhangi_happy(chamber, session):
             # if weights_by_i[(m1['id'], m2['id'])] == 1:
                 # print shared_bills, to_bills[m1['id']]
         party[m1['id']] = m1['party']
-    np.save('zhangi/happy_wcg_%s_%s_weights_total' % (chamber, session), weights_total)
-    np.save('zhangi/happy_wcg_%s_%s_weights_by_i' % (chamber, session), weights_by_i)
-    np.save('zhangi/happy_wcg_%s_%s_party' % (chamber, session), party)
+    np.save('processed_data/happy_wcg_%s_%s_weights_total' % (chamber, session), weights_total)
+    np.save('processed_data/happy_wcg_%s_%s_weights_by_i' % (chamber, session), weights_by_i)
+    np.save('processed_data/happy_wcg_%s_%s_party' % (chamber, session), party)
 
 
 def read_bcg(chamber, session):
